@@ -1,6 +1,9 @@
 package cursojava.gestorpedidos;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Scanner;
 
 import javax.sound.sampled.Line;
 
@@ -8,6 +11,7 @@ import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.Transaction;
 import org.hibernate.cfg.Configuration;
+import org.hibernate.query.Query;
 
 
 /**
@@ -16,6 +20,7 @@ import org.hibernate.cfg.Configuration;
 public class App {
     private static SessionFactory factory;
     private static Session session;
+    private static Scanner scanner;
 
     public static void main(String[] args) {
         System.out.println("Bienvenido al Gestor de Pedidos.");
@@ -36,47 +41,262 @@ public class App {
 
         session = factory.openSession();
 
+        int opcion = -1;
+        
+        scanner = new Scanner(System.in);
 
-        // Generar un pedido manualmente
+        while (opcion != 0) {
+            // Menú de opciones
+            System.out.println("Menú de opciones:");
+            System.out.println("1. Generar un pedido");
+            System.out.println("2. Consultar pedidos");
+            System.out.println("3. Añadir cliente");
+            System.out.println("4. Modificar cliente");
+            System.out.println("5. Eliminar cliente");
+            System.out.println("0. Salir");
+            System.out.print("Seleccione una opción> ");
+            opcion = scanner.nextInt();
+            scanner.nextLine(); // Consumir el salto de línea
 
-        // Transaction t = session.beginTransaction();
+            switch (opcion) {
+                case 1:
+                    // Lógica para generar un pedido
+                    System.out.println("Generando un pedido...");
+                    generarPedido();
+                    break;
+                case 2:
+                    // Lógica para consultar pedidos
+                    System.out.println("Consultando pedidos...");
+                    consultarPedidos();
+                    break;
+                case 3:
+                    System.out.println("Añadir cliente...");
+                    anadirCliente();
+                    break;
+                case 4:
+                    System.out.println("Modificar cliente...");
+                    modificarCliente();
+                    break;
+                case 5:
+                    System.out.println("Eliminar cliente...");
+                    eliminarCliente();
+                    break;
+                case 0:
+                    System.out.println("Saliendo del programa...");
+                    break;
+                default:
+                    System.out.println("Opción no válida. Por favor, intente de nuevo.");
+            }
+        }
 
-        // Cliente c = session.find(Cliente.class, 1L);
-        // session.persist(c);
-
-        // Pedido p = new Pedido();
-        // p.setCliente(c);
-
-        // p.setFecha(LocalDate.now());
-        // session.persist(p);
-
-        // Articulo a1 = session.find(Articulo.class, 1L);
-        // LineaPedido lp1 = new LineaPedido(p, a1, 2);
-        // session.persist(lp1);
-
-        // Articulo a2 = session.find(Articulo.class, 2L);
-        // LineaPedido lp2 = new LineaPedido(p, a2, 3);
-        // session.persist(lp2);
-
-        // Articulo a3 = session.find(Articulo.class, 3L);
-        // LineaPedido lp3 = new LineaPedido(p, a3, 5);
-        // session.persist(lp3);
 
 
-        // t.commit();
 
-
-        // Consultar un pedido
-        Transaction t2 = session.beginTransaction();
-        Pedido pedido = session.createQuery("from Pedido p where p.cliente.nombre = :nombre", Pedido.class)
-            .setParameter("nombre", "Claudina Lutsch")
-            .getSingleResult();
-        System.out.println("Pedido encontrado: " + pedido);
-
-        t2.commit();
 
         // Cerrar cosas
+        scanner.close();
         session.close();
         factory.close();
+    }
+
+
+    /**
+     * Eliminación de un cliente existente en la base de datos de forma interactiva.
+     * Primero muestra una lista de clientes y permite seleccionar uno indicando su ID.
+     * A continuación, elimina el cliente seleccionado de la base de datos.
+     */
+    private static void eliminarCliente() {
+        System.out.println("Seleccione el cliente a eliminar:");
+        Cliente cliente = seleccionarCliente();
+
+        Transaction t = session.beginTransaction();
+        session.remove(cliente);
+        t.commit();
+    }
+
+    /**
+     * Método para modificar un cliente existente en la base de datos de forma interactiva.
+     * Primero muestra una lista de clientes y permite seleccionar uno indicando su ID.
+     * A continuación, solicita los nuevos datos del cliente y actualiza la información en la base
+     * de datos.
+     */
+    private static void modificarCliente() {
+        System.out.println("Seleccione el cliente a modificar:");
+        Cliente cliente = seleccionarCliente();
+
+        System.out.print("Nuevo nombre del cliente (actual: " + cliente.getNombre() + ")> ");
+        String nuevoNombre = scanner.nextLine();
+        System.out.print("Nueva dirección del cliente (actual: " + cliente.getDireccion() + ")> ");
+        String nuevaDireccion = scanner.nextLine();
+        System.out.println("Observaciones actuales: " + cliente.getObservaciones());
+        System.out.print("Nuevas observaciones del cliente> ");
+        String nuevasObservaciones = scanner.nextLine();
+        cliente.setNombre(nuevoNombre);
+        cliente.setDireccion(nuevaDireccion);
+        cliente.setObservaciones(nuevasObservaciones);
+
+        Transaction t = session.beginTransaction();
+        session.merge(cliente);
+        t.commit();
+    }
+
+    /**
+     * Método para añadir un nuevo cliente a la base de datos, de forma interactiva.
+     * Solicita al usuario los datos del cliente y lo guarda en la base de datos.
+     */
+    private static void anadirCliente() {
+        System.out.print("Nombre del cliente> ");
+        String nombre = scanner.nextLine();
+        System.out.print("Dirección del cliente> ");
+        String direccion = scanner.nextLine();
+
+        Cliente cliente = new Cliente();
+        cliente.setNombre(nombre);
+        cliente.setDireccion(direccion);
+
+        Transaction t = session.beginTransaction();
+        session.persist(cliente);
+        t.commit();
+
+        System.out.println("Cliente añadido con ID: " + cliente.getId());
+    }
+
+    /**
+     * Consulta los pedidos existentes en la base de datos, mostrándolos por pantalla.
+     * La información que ha de mostrar incluye el ID del pedido, la fecha, el nombre del
+     * cliente, las líneas del pedido y el importe total del pedido.
+     */
+    private static void consultarPedidos() {
+        System.out.println("Pedidos existentes:");
+        Query<Pedido> query = session.createQuery("select p from Pedido p join fetch p.cliente", Pedido.class);
+        List<Pedido> pedidos = query.list();
+
+        for (Pedido pedido : pedidos) {
+            System.out.println("ID Pedido: " + pedido.getId());
+            System.out.println("Fecha: " + pedido.getFecha());
+            System.out.println("Cliente: " + pedido.getCliente().getNombre());
+            System.out.println("Líneas del pedido:");
+            
+            Query<LineaPedido> query2 = session.createQuery("select lp from LineaPedido lp join fetch lp.articulo where lp.pedido.id = :pedidoId", LineaPedido.class);
+            query2.setParameter("pedidoId", pedido.getId());
+            List<LineaPedido> lineasPedido = query2.list();
+
+            for (LineaPedido l : lineasPedido) {
+                Articulo a = l.getArticulo();
+                System.out.println("\tArtículo: " + a.getDenominacion() +
+                                   ", Cantidad: " + l.getCantidad() +
+                                   ", Precio unitario: " + a.getPrecioUnitario()); 
+            }
+
+            Query<BigDecimal> queryTotal = session.createQuery(
+                "select sum(lp.cantidad * a.precioUnitario) from LineaPedido as lp join lp.articulo as a where lp.pedido = :pedidoId",
+                BigDecimal.class
+            );
+            queryTotal.setParameter("pedidoId", pedido);
+            BigDecimal total = queryTotal.getSingleResult();
+
+            System.out.println("Importe total del pedido: " + total);
+
+            System.out.println("--------------------------------------------------");
+        }
+    }
+
+    /**
+     * Genera un pedido de forma interactiva.
+     * Se le solicita al usuario que seleccione un cliente, y a continuación
+     * se le permite añadir artículos al pedido, indicando la cantidad de cada
+     * uno de ellos.
+     * Finalmente, se guarda el pedido y sus líneas en la base de datos.
+     */
+    private static void generarPedido() {
+        // Seleccionar cliente, utilizando el método seleccionarCliente()
+        System.out.println("Seleccione un cliente para el pedido:");
+        Cliente cliente = seleccionarCliente();
+        // Fecha del pedido (hoy)
+        LocalDate fecha = LocalDate.now(); // fecha de hoy
+
+        // Crear el pedido, con el cliente y la fecha seleccionados
+        Pedido pedido = new Pedido();
+        pedido.setCliente(cliente);
+        pedido.setFecha(fecha);
+        
+        Transaction t = session.beginTransaction();
+        session.persist(pedido);
+
+        // Bucle para añadir líneas al pedido.
+        // Se interrumpirá cuando el usuario decida no añadir más artículos.
+        while (true) {
+
+            System.out.println("Seleccione un artículo para añadir al pedido:");
+            Articulo articulo = seleccionarArticulo();
+            System.out.print("Cantidad> ");
+            int cantidad = scanner.nextInt();
+            scanner.nextLine(); // Consumir el salto de línea
+
+            LineaPedido lp = new LineaPedido(pedido, articulo, cantidad);
+            session.persist(lp);
+
+            System.out.print("¿Desea añadir otro artículo? (s/n)> ");
+            String respuesta = scanner.nextLine();
+            if (!respuesta.equalsIgnoreCase("s")) {
+                break; // Salir del bucle; no se añaden más artículos
+            }
+        }
+
+        t.commit();
+    }
+
+    /**
+     * Permite seleccionar un artículo de la base de datos de forma interactiva.
+     * Se le muestra al usuario una lista con los artículos disponibles y se le
+     * solicita que introduzca el ID del artículo que desea seleccionar.
+     * @return El artículo seleccionado.
+     */
+    private static Articulo seleccionarArticulo() {
+        // Primera consulta para obtener una lista con todos los artículos
+        Query<Articulo> query = session.createQuery("from Articulo", Articulo.class);
+        List<Articulo> articulos = query.list();
+
+        // Mostramos la lista de artículos, para que el usuario pueda elegir
+        System.out.println("Artículos disponibles:");
+        for (Articulo articulo : articulos) {
+            System.out.println(articulo.getId() + "\t" + articulo.getDenominacion());
+        }
+
+        // Solciitamos ID de artículo al usuario
+        System.out.print("ID del artículo> ");
+        Long articuloId = scanner.nextLong();
+        scanner.nextLine(); // Consumir el salto de línea
+
+        // Segunda consulta que obtene el artículo seleccionado, identificado por su ID
+        Articulo articuloSeleccionado = session.find(Articulo.class, articuloId);
+        return articuloSeleccionado;
+    }
+
+    /**
+     * Permite seleccionar un cliente de la base de datos de forma interactiva.
+     * Se le muestra al usuario una lista con los clientes disponibles y se le
+     * solicita que introduzca el ID del cliente que desea seleccionar.
+     * @return El cliente seleccionado.
+     */
+    private static Cliente seleccionarCliente() {
+        // Primera consulta para obtener una lista con todos los clientes
+        Query<Cliente> query = session.createQuery("from Cliente c order by c.id", Cliente.class);
+        List<Cliente> clientes = query.list();
+
+        // Mostramos la lista de clientes, para que el usuario pueda elegir
+        System.out.println("Clientes disponibles:");
+        for (Cliente cliente : clientes) {
+            System.out.println(cliente.getId() + "\t" + cliente.getNombre());
+        }
+
+        // Solciitamos ID de cliente al usuario
+        System.out.print("ID del cliente> ");
+        Long clienteId = scanner.nextLong();
+        scanner.nextLine(); // Consumir el salto de línea
+
+        // Segunda consulta que obtene el cliente seleccionado, identificado por su ID
+        Cliente clienteSeleccionado = session.find(Cliente.class, clienteId);
+        return clienteSeleccionado;
     }
 }
